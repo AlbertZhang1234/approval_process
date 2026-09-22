@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="通用审批流框架本地演示环境" />
+    <title>Approval Lab · 审批流测试台</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/config.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero__eyebrow">APPROVAL FLOW / LOCAL LAB</div>
+      <div class="hero__content">
+        <div>
+          <h1>审批流测试台</h1>
+          <p>用真实的核心接口发起、流转并观察审批，不写入任何外部数据库。</p>
+        </div>
+        <div class="hero__actions">
+          <span class="health"><i></i> 内存环境运行中</span>
+          <button id="reset-button" class="button button--ghost" type="button">重置演示数据</button>
+        </div>
+      </div>
+      <div class="hero__stats" aria-label="已实现能力摘要">
+        <span><strong>4</strong> 审批动作</span>
+        <span><strong>9</strong> 条件操作符</span>
+        <span><strong>16</strong> 能力实验</span>
+        <span><strong>DEAD</strong> 死信队列</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <section class="panel create-panel">
+          <div class="section-heading">
+            <span class="section-heading__index">01</span>
+            <div>
+              <h2>发起审批</h2>
+              <p>选择一个内置流程创建申请</p>
+            </div>
+          </div>
+
+          <form id="start-form">
+            <fieldset id="workflow-picker" class="workflow-picker" aria-label="审批流程"></fieldset>
+
+            <label class="field">
+              <span>业务单号</span>
+              <input id="business-id" name="businessId" required autocomplete="off" />
+            </label>
+
+            <label id="primary-value-field" class="field">
+              <span id="value-label">报销金额（元）</span>
+              <input id="context-value" name="value" type="number" min="0" step="0.5" required />
+              <small id="value-hint">达到 5,000 元将进入财务审批</small>
+            </label>
+
+            <label class="field">
+              <span>申请人</span>
+              <select id="applicant-id" name="applicantId"></select>
+            </label>
+
+            <details class="business-advanced">
+              <summary>高级业务参数</summary>
+              <label class="field">
+                <span>业务类型</span>
+                <input id="business-type" name="businessType" autocomplete="off" />
+              </label>
+              <label class="field">
+                <span>详情地址</span>
+                <input id="business-url" name="businessUrl" autocomplete="off" placeholder="/business/DETAIL-001" />
+              </label>
+              <label class="field">
+                <span>幂等键（留空自动生成）</span>
+                <input id="idempotency-key" name="idempotencyKey" autocomplete="off" />
+              </label>
+              <div class="field">
+                <span>业务上下文字段</span>
+                <div id="business-context-fields" class="key-value-list"></div>
+                <button id="add-business-context" class="button button--secondary button--small" type="button">＋ 添加字段</button>
+                <small>条件字段和 REQUEST_FIELD 审批人从这里读取</small>
+              </div>
+            </details>
+
+            <button class="button button--primary button--full" type="submit">提交到审批流 <span>→</span></button>
+          </form>
+        </section>
+
+        <section class="panel guide-panel">
+          <div class="section-heading section-heading--compact">
+            <span class="section-heading__index">TIP</span>
+            <div>
+              <h2>建议测试路径</h2>
+            </div>
+          </div>
+          <ol>
+            <li>提交一笔低于 5,000 元的报销，经理同意后直接结束。</li>
+            <li>提交高额报销，让财务“退回申请人”，修改金额后重新提交。</li>
+            <li>在待办上“退回指定节点”，观察节点新轮次任务。</li>
+            <li>申请人撤回误提交单据，或用取消作废流程。</li>
+            <li>打开毒消息模拟，运行 Outbox Worker 观察重试与死信。</li>
+          </ol>
+        </section>
+
+        <nav class="panel demo-nav" aria-label="演示区域导航">
+          <a href="#config-section"><span>00</span> 配置中心</a>
+          <a href="#inbox-section"><span>01</span> 统一待办</a>
+          <a href="#instances-section"><span>02</span> 审批实例</a>
+          <a href="#definitions-section"><span>03</span> 流程定义</a>
+          <a href="#lab-section"><span>04</span> 能力实验室</a>
+          <a href="#integration-section"><span>05</span> 事件与邮件</a>
+          <a href="#worker-section"><span>06</span> Outbox Worker</a>
+        </nav>
+      </aside>
+
+      <div class="workspace">
+        <section class="workspace__section capability-overview">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">CORE</span>
+              <div>
+                <h2>当前内核能力全景</h2>
+                <p>以下均由当前代码实现并可在本页操作或验证</p>
+              </div>
+            </div>
+            <span class="status status--approved">IMPLEMENTED</span>
+          </div>
+          <div class="capability-tags">
+            <span>顺序流转</span><span>条件分支</span><span>ANY 或签</span><span>ALL 会签</span>
+            <span>审批 / 驳回</span><span>幂等</span><span>乐观锁</span><span>版本快照</span>
+            <span>执行历史</span><span>Outbox</span><span>邮件通知</span><span>安全校验</span>
+          </div>
+        </section>
+
+        <section id="config-section" class="workspace__section config-section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">00</span>
+              <div>
+                <h2>系统配置中心</h2>
+                <p>通过表单配置流程、审批策略、组织架构、联系人和通知行为</p>
+              </div>
+            </div>
+            <span id="config-status" class="counter">配置已载入</span>
+          </div>
+
+          <div id="runtime-config" class="runtime-config"></div>
+
+          <div class="config-tabs" role="tablist" aria-label="配置分类">
+            <button class="config-tab config-tab--active" data-config-tab="workflow" type="button">流程设计与发布</button>
+            <button class="config-tab" data-config-tab="host" type="button">组织、联系人与通知</button>
+            <button class="config-tab" data-config-tab="catalog" type="button">全部配置项索引</button>
+          </div>
+
+          <div class="config-pane config-pane--active" data-config-pane="workflow">
+            <div class="config-toolbar">
+              <label>载入已发布流程 <select id="config-workflow-select"></select></label>
+              <button id="clone-workflow" class="button button--secondary" type="button">克隆下一版本</button>
+              <button id="new-workflow" class="button button--secondary" type="button">新建最小流程</button>
+            </div>
+            <div class="workflow-form" id="workflow-config-form">
+              <div class="form-block">
+                <div class="form-block__heading"><div><span>STEP 1</span><h3>流程基本信息</h3></div><div id="workflow-editor-summary" class="editor-summary"></div></div>
+                <div class="workflow-meta-grid">
+                  <label>流程 Key<input id="workflow-key" required /></label>
+                  <label>流程名称<input id="workflow-name" required /></label>
+                  <label>版本号<input id="workflow-version" type="number" min="1" step="1" required /></label>
+                  <label class="workflow-description-field">流程描述<input id="workflow-description" /></label>
+                </div>
+              </div>
+
+              <div class="form-block">
+                <div class="form-block__heading"><div><span>STEP 2</span><h3>节点配置</h3></div><button id="add-workflow-node" class="button button--secondary button--small" type="button">＋ 添加节点</button></div>
+                <div id="workflow-node-list" class="workflow-node-list"></div>
+              </div>
+
+              <div class="form-block">
+                <div class="form-block__heading"><div><span>STEP 3</span><h3>连线与条件</h3></div><button id="add-workflow-edge" class="button button--secondary button--small" type="button">＋ 添加连线</button></div>
+                <div id="workflow-edge-list" class="workflow-edge-list"></div>
+              </div>
+
+              <div class="workflow-form-actions">
+                <button id="check-workflow" class="button button--secondary" type="button">仅校验</button>
+                <button id="publish-workflow" class="button button--primary" type="button">校验并发布 <span>→</span></button>
+              </div>
+            </div>
+            <div id="workflow-config-result" class="config-result">等待操作</div>
+          </div>
+
+          <div class="config-pane" data-config-pane="host">
+            <div class="notification-config">
+              <label><input id="notify-task-created" type="checkbox" /> 新待办通知审批人</label>
+              <label><input id="notify-final-result" type="checkbox" /> 最终结果通知申请人</label>
+            </div>
+            <div class="form-block">
+              <div class="form-block__heading"><div><span>CONTACTS</span><h3>用户与邮件联系人</h3></div><button id="add-person" class="button button--secondary button--small" type="button">＋ 添加用户</button></div>
+              <div id="people-config-list" class="people-config-list"></div>
+            </div>
+            <div class="form-block">
+              <div class="form-block__heading"><div><span>ORGANIZATION</span><h3>组织与审批人映射</h3></div></div>
+              <div id="organization-config-forms" class="organization-config-forms"></div>
+            </div>
+            <button id="save-host-config" class="button button--primary" type="button">保存宿主配置</button>
+            <div id="host-config-result" class="config-result">修改只影响后续新建任务和通知</div>
+          </div>
+
+          <div class="config-pane" data-config-pane="catalog">
+            <div id="config-catalog" class="catalog-grid"></div>
+            <div class="config-audit-panel">
+              <h3>配置审计</h3>
+              <div id="config-audit"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="inbox-section" class="workspace__section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">01</span>
+              <div>
+                <h2>统一待办</h2>
+                <p>queryTasks：按人 / 状态 / 业务类型过滤，游标分页与排序</p>
+              </div>
+            </div>
+            <span id="inbox-count" class="counter">0 条待办</span>
+          </div>
+          <form id="inbox-query-form" class="inbox-query">
+            <label>审批人<select id="inbox-assignee" aria-label="审批人"></select></label>
+            <label>状态
+              <select id="inbox-status" aria-label="任务状态">
+                <option value="PENDING">待处理</option>
+                <option value="APPROVED">已同意</option>
+                <option value="REJECTED">已驳回</option>
+                <option value="CANCELED">已取消</option>
+              </select>
+            </label>
+            <label>业务类型<input id="inbox-business-type" placeholder="expense / leave / 自定义" autocomplete="off" /></label>
+            <label>每页
+              <select id="inbox-limit" aria-label="每页条数">
+                <option value="5">5 条</option>
+                <option value="10" selected>10 条</option>
+                <option value="20">20 条</option>
+              </select>
+            </label>
+            <label>排序
+              <select id="inbox-order" aria-label="排序方式">
+                <option value="CREATED_DESC">创建时间 ↓</option>
+                <option value="CREATED_ASC">创建时间 ↑</option>
+              </select>
+            </label>
+            <div class="inbox-query__actions">
+              <button id="inbox-prev" class="button button--secondary button--small" type="button" disabled>上一页</button>
+              <button id="inbox-next" class="button button--secondary button--small" type="button" disabled>下一页</button>
+            </div>
+          </form>
+          <div id="inbox" class="inbox-grid"></div>
+          <div class="lookup-panel">
+            <div class="lookup-panel__heading">
+              <div>
+                <h3>业务反查实例</h3>
+                <p>业务单据详情页用 getInstanceByBusiness 定位最新审批实例（支持状态过滤）</p>
+              </div>
+            </div>
+            <form id="business-lookup-form" class="lookup-form">
+              <label>业务类型<input id="lookup-type" value="expense" required autocomplete="off" /></label>
+              <label>业务单号<input id="lookup-id" value="EXP-RETURN" required autocomplete="off" /></label>
+              <label>状态（可选）
+                <select id="lookup-status" aria-label="实例状态过滤">
+                  <option value="">不过滤</option>
+                  <option>RUNNING</option>
+                  <option>APPROVED</option>
+                  <option>REJECTED</option>
+                  <option>WITHDRAWN</option>
+                  <option>CANCELED</option>
+                </select>
+              </label>
+              <button class="button button--secondary" type="submit">查询实例</button>
+            </form>
+            <div id="business-lookup-result" class="lookup-result">输入业务类型和单号后查询。</div>
+          </div>
+        </section>
+
+        <section id="instances-section" class="workspace__section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">02</span>
+              <div>
+                <h2>审批实例</h2>
+                <p>含退回重提、撤回与取消的完整轨迹</p>
+              </div>
+            </div>
+            <span id="instance-count" class="counter">0 个实例</span>
+          </div>
+          <div id="instances" class="instance-list"></div>
+        </section>
+
+        <section id="definitions-section" class="workspace__section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">03</span>
+              <div>
+                <h2>流程定义</h2>
+                <p>查看节点、条件路由和审批策略配置</p>
+              </div>
+            </div>
+          </div>
+          <div id="definitions" class="definition-grid"></div>
+        </section>
+
+        <section id="lab-section" class="workspace__section lab-section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">04</span>
+              <div>
+                <h2>能力实验室</h2>
+                <p>每个实验都在隔离内存中调用真实内核并返回证据</p>
+              </div>
+            </div>
+            <button id="run-all-labs" class="button button--dark" type="button">运行全部实验</button>
+          </div>
+          <div id="lab-cards" class="lab-grid"></div>
+          <div id="lab-results" class="lab-results" aria-live="polite"></div>
+
+          <details class="validator-workbench">
+            <summary>打开流程定义校验台</summary>
+            <div class="validator-workbench__body">
+              <div>
+                <h3>校验场景</h3>
+                <p>选择预设场景，交给 parseWorkflowDefinition 严格校验。</p>
+                <div class="validator-actions">
+                  <select id="validator-preset" aria-label="校验预设">
+                    <option value="valid">合法报销流程</option>
+                    <option value="cycle">非法环路</option>
+                    <option value="unknown">非法未知字段</option>
+                  </select>
+                  <button id="validate-workflow" class="button button--primary" type="button">执行校验</button>
+                </div>
+              </div>
+              <div id="validation-preview" class="validation-preview"></div>
+              <div id="validation-result" class="validation-result">等待校验</div>
+            </div>
+          </details>
+        </section>
+
+        <section id="integration-section" class="workspace__section integration-grid">
+          <div class="events-section">
+            <div class="section-heading section-heading--row">
+              <div class="section-heading__title">
+                <span class="section-heading__index">05A</span>
+                <div>
+                  <h2>Outbox 事件</h2>
+                  <p>与审批状态一起提交的领域事件及其投递状态</p>
+                </div>
+              </div>
+              <span id="event-count" class="counter">0 条事件</span>
+            </div>
+            <div id="events" class="event-list"></div>
+          </div>
+
+          <div class="events-section">
+            <div class="section-heading section-heading--row">
+              <div class="section-heading__title">
+                <span class="section-heading__index">05B</span>
+                <div>
+                  <h2>邮件沙箱</h2>
+                  <p>ApprovalEmailNotifier 渲染后的本地邮件</p>
+                </div>
+              </div>
+              <span id="email-count" class="counter">0 封邮件</span>
+            </div>
+            <div id="emails" class="email-list"></div>
+          </div>
+        </section>
+
+        <section id="worker-section" class="workspace__section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">06</span>
+              <div>
+                <h2>Outbox Worker 控制台</h2>
+                <p>createOutboxWorker：领取 → 处理 → 确认 / 退避重试 / 达到上限进入死信</p>
+              </div>
+            </div>
+            <div class="worker-actions">
+              <label class="poison-toggle"><input id="poison-toggle" type="checkbox" /> 毒消息模拟（新待办邮件必失败）</label>
+              <button id="worker-run" class="button button--dark" type="button">运行一轮 Worker</button>
+            </div>
+          </div>
+          <div class="worker-layout">
+            <div class="worker-panel">
+              <div class="worker-panel__heading"><h3>投递状态</h3><span id="worker-stats" class="counter">0 待处理 · 0 已处理 · 0 失败 · 0 死信</span></div>
+              <div id="worker-events" class="worker-event-list"></div>
+            </div>
+            <div class="worker-panel">
+              <div class="worker-panel__heading"><h3>死信队列</h3><span class="counter">重置后重新投递</span></div>
+              <div id="worker-dead" class="worker-dead-list"></div>
+              <div class="worker-panel__heading worker-panel__heading--gap"><h3>死信告警记录</h3></div>
+              <div id="worker-incidents" class="worker-incident-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace__section roadmap-section">
+          <div class="section-heading section-heading--row">
+            <div class="section-heading__title">
+              <span class="section-heading__index">NEXT</span>
+              <div>
+                <h2>尚未实现 / 路线图</h2>
+                <p>这些能力仅存在于设计文档，当前 demo 不会伪造结果</p>
+              </div>
+            </div>
+          </div>
+          <div class="roadmap-list">
+            <span>转交 / 加签</span><span>超时催办</span><span>并行网关</span><span>业务状态回写模式</span>
+            <span>多语言邮件模板</span><span>拖拽式流程画布</span>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <template id="empty-template">
+      <div class="empty-state">
+        <div class="empty-state__icon">↗</div>
+        <h3>还没有审批实例</h3>
+        <p>从左侧提交第一条申请，流程轨迹会显示在这里。</p>
+      </div>
+    </template>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

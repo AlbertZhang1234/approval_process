@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/workflow-definition.schema.json",
+  "title": "Approval workflow definition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["key", "name", "version", "nodes", "edges"],
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/edge" }
+    }
+  },
+  "$defs": {
+    "node": {
+      "oneOf": [
+        { "$ref": "#/$defs/basicNode" },
+        { "$ref": "#/$defs/approvalNode" }
+      ]
+    },
+    "basicNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "enum": ["START", "CONDITION", "END"] },
+        "name": { "$ref": "#/$defs/name" }
+      }
+    },
+    "approvalNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "name", "config"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": { "const": "APPROVAL" },
+        "name": { "$ref": "#/$defs/name" },
+        "config": { "$ref": "#/$defs/approvalConfig" }
+      }
+    },
+    "approvalConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "assignees", "emptyAssigneePolicy", "selfApprovalPolicy"],
+      "properties": {
+        "mode": { "enum": ["ANY", "ALL"] },
+        "assignees": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/assigneePolicy" }
+        },
+        "emptyAssigneePolicy": { "enum": ["ERROR", "SKIP", "AUTO_APPROVE"] },
+        "selfApprovalPolicy": { "enum": ["ALLOW", "SKIP", "REQUIRE_OTHER"] }
+      }
+    },
+    "assigneePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "enum": ["USER", "ROLE", "DEPARTMENT_ROLE", "MANAGER", "REQUEST_FIELD", "PROVIDER"]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "target"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/id" },
+        "target": { "$ref": "#/$defs/id" },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "default": {
+          "type": "boolean",
+          "default": false
+        },
+        "condition": { "$ref": "#/$defs/condition" }
+      }
+    },
+    "condition": {
+      "oneOf": [
+        { "$ref": "#/$defs/predicate" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["all"],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["any"],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/condition" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["not"],
+          "properties": {
+            "not": { "$ref": "#/$defs/condition" }
+          }
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "operator"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_.]{0,127}$"
+        },
+        "operator": {
+          "enum": ["EQ", "NE", "GT", "GTE", "LT", "LTE", "IN", "NOT_IN", "EXISTS"]
+        },
+        "value": {}
+      }
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{1,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    }
+  }
+}

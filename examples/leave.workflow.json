@@ -1,0 +1,89 @@
+{
+  "key": "leave-approval",
+  "name": "请假审批",
+  "version": 1,
+  "description": "直属上级审批，请假超过 3 天时增加人事审批。",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "START",
+      "name": "开始"
+    },
+    {
+      "id": "manager_review",
+      "type": "APPROVAL",
+      "name": "直属上级审批",
+      "config": {
+        "mode": "ANY",
+        "assignees": [
+          {
+            "type": "MANAGER",
+            "value": "1"
+          }
+        ],
+        "emptyAssigneePolicy": "ERROR",
+        "selfApprovalPolicy": "REQUIRE_OTHER"
+      }
+    },
+    {
+      "id": "duration_gate",
+      "type": "CONDITION",
+      "name": "请假天数判断"
+    },
+    {
+      "id": "hr_review",
+      "type": "APPROVAL",
+      "name": "人事审批",
+      "config": {
+        "mode": "ANY",
+        "assignees": [
+          {
+            "type": "ROLE",
+            "value": "hr-approver"
+          }
+        ],
+        "emptyAssigneePolicy": "ERROR",
+        "selfApprovalPolicy": "REQUIRE_OTHER"
+      }
+    },
+    {
+      "id": "approved_end",
+      "type": "END",
+      "name": "审批通过"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_start_manager",
+      "source": "start",
+      "target": "manager_review"
+    },
+    {
+      "id": "e_manager_duration",
+      "source": "manager_review",
+      "target": "duration_gate"
+    },
+    {
+      "id": "e_long_leave",
+      "source": "duration_gate",
+      "target": "hr_review",
+      "priority": 10,
+      "condition": {
+        "field": "days",
+        "operator": "GT",
+        "value": 3
+      }
+    },
+    {
+      "id": "e_short_leave",
+      "source": "duration_gate",
+      "target": "approved_end",
+      "default": true
+    },
+    {
+      "id": "e_hr_end",
+      "source": "hr_review",
+      "target": "approved_end"
+    }
+  ]
+}

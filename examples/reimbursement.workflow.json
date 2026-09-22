@@ -1,0 +1,90 @@
+{
+  "key": "expense-approval",
+  "name": "报销审批",
+  "version": 1,
+  "description": "直属上级审批，金额达到 5000 元时增加财务审批。",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "START",
+      "name": "开始"
+    },
+    {
+      "id": "manager_review",
+      "type": "APPROVAL",
+      "name": "直属上级审批",
+      "config": {
+        "mode": "ANY",
+        "assignees": [
+          {
+            "type": "MANAGER",
+            "value": "1"
+          }
+        ],
+        "emptyAssigneePolicy": "ERROR",
+        "selfApprovalPolicy": "REQUIRE_OTHER"
+      }
+    },
+    {
+      "id": "amount_gate",
+      "type": "CONDITION",
+      "name": "金额判断"
+    },
+    {
+      "id": "finance_review",
+      "type": "APPROVAL",
+      "name": "财务审批",
+      "config": {
+        "mode": "ANY",
+        "assignees": [
+          {
+            "type": "ROLE",
+            "value": "finance-approver"
+          }
+        ],
+        "emptyAssigneePolicy": "ERROR",
+        "selfApprovalPolicy": "REQUIRE_OTHER"
+      }
+    },
+    {
+      "id": "approved_end",
+      "type": "END",
+      "name": "审批通过"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e_start_manager",
+      "source": "start",
+      "target": "manager_review"
+    },
+    {
+      "id": "e_manager_amount",
+      "source": "manager_review",
+      "target": "amount_gate"
+    },
+    {
+      "id": "e_high_amount",
+      "source": "amount_gate",
+      "target": "finance_review",
+      "priority": 10,
+      "condition": {
+        "field": "amount",
+        "operator": "GTE",
+        "value": 5000
+      }
+    },
+    {
+      "id": "e_normal_amount",
+      "source": "amount_gate",
+      "target": "approved_end",
+      "default": true
+    },
+    {
+      "id": "e_finance_end",
+      "source": "finance_review",
+      "target": "approved_end"
+    }
+  ]
+}
+

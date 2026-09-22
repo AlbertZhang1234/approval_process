@@ -1,0 +1,67 @@
+{
+  "name": "@approval-flow/core",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Embeddable approval workflow core for TypeScript applications",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./testing": {
+      "types": "./dist/esm/adapters/in-memory/index.d.ts",
+      "import": "./dist/esm/adapters/in-memory/index.js",
+      "require": "./dist/cjs/adapters/in-memory/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/esm/adapters/postgres/index.d.ts",
+      "import": "./dist/esm/adapters/postgres/index.js",
+      "require": "./dist/cjs/adapters/postgres/index.js"
+    },
+    "./supabase": {
+      "types": "./dist/esm/adapters/supabase/index.d.ts",
+      "import": "./dist/esm/adapters/supabase/index.js",
+      "require": "./dist/cjs/adapters/supabase/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "contracts",
+    "docs",
+    "supabase",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true }); require('node:fs').rmSync('.test-dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-package.mjs",
+    "build:test": "tsc -p tsconfig.test.json",
+    "test": "npm run build:test && node --test .test-dist/tests/*.test.js",
+    "prepack": "npm run typecheck && npm test && npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "demo": "npm run build && node demo/server.mjs",
+    "demo:serve": "node demo/server.mjs",
+    "test:demo": "npm run build && node demo/smoke-test.mjs",
+    "test:demo-api": "node demo/api-smoke-test.mjs"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "peerDependencies": {
+    "postgres": "^3.4.9"
+  },
+  "peerDependenciesMeta": {
+    "postgres": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "postgres": "^3.4.9",
+    "typescript": "^5.9.2"
+  }
+}
