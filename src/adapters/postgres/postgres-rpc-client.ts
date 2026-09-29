@@ -30,9 +30,14 @@ export class PostgresRpcClient implements ApprovalRpcClient {
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown> {
     if (!ALLOWED_FUNCTIONS.has(functionName)) throw new Error("Unsupported approval database function");
+    // Bind with sql.json, not JSON.stringify(input): postgres.js sends plain
+    // string parameters as text, and `$1::jsonb` then yields a JSON *string*
+    // value inside the function, so every `p_input ->> '...'` lookup returns
+    // NULL. sql.json makes the server receive a real jsonb object. The JSON
+    // round-trip also converts the readonly input into a plain JSON value.
     const rows = await this.sql.unsafe(
       `select approval_api.${functionName}($1::jsonb) as result`,
-      [JSON.stringify(input)],
+      [this.sql.json(JSON.parse(JSON.stringify(input)))],
     );
     return rows[0]?.["result"] ?? null;
   }
